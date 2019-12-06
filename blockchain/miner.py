@@ -15,9 +15,9 @@ import random
 from style import color
 
 titlecard = """
-╦  ┌─┐┌┬┐┌┐ ┌┬┐┌─┐╔═╗┌─┐┬┌┐┌
-║  ├─┤│││├┴┐ ││├─┤║  │ │││││
-╩═╝┴ ┴┴ ┴└─┘─┴┘┴ ┴╚═╝└─┘┴┘└┘
+╦  ┌─┐┌┬┐┌┐ ┌┬┐┌─┐  ╔═╗┌─┐ ┬ ┌┐┌
+║  ├─┤│││├┴┐ ││├─┤  ║  │ │ │ │││
+╩═╝┴ ┴┴ ┴└─┘─┴┘┴ ┴  ╚═╝└─┘ ┴ ┘└┘
 """
 
 new_block = False
@@ -35,31 +35,38 @@ def proof_of_work(last_proof):
 
     start = timer()
 
-    print(f"{color.BOLD}Searching for next proof{color.END}")
+    print(f"\n{color.BOLD}Searching for next proof{color.END}")
     last_hash = hashlib.sha256(str(last_proof).encode()).hexdigest()
-    proof = random.randint(420, 6969696969696969)
+    proof = random.randint(420, 6969696969696969696969)
 
-    Spinny()
-    # PollNewBlock(last_proof, interval=1)
+    # spinning_cursor = threading.Thread(target=Spinny, args=())
+    # spinning_cursor.start()
+    block_poller = threading.Thread(target=PollNewBlock, args=(last_proof, 3))
+    block_poller.start()
 
     while not valid_proof(last_hash, proof):
-        if not new_block:
-            proof += 1
+        if new_block:
+            # spinning_cursor.join()
+            # block_poller.join()
+            return
+        proof += 1
 
-    print("Proof found: " + str(proof) + " in " + str(timer() - start))
+    print(
+        "Proof found: "
+        + str(proof)
+        + " in "
+        + "{:01.2f}".format(timer() - start)
+        + " seconds"
+    )
+    # spinning_cursor.join()
+    # block_poller.join()
     return proof
 
 
-class PollNewBlock(object):
-    def __init__(self, last_proof, interval=5):
-        self.interval = interval
-        self.last_proof = last_proof
+def PollNewBlock(last_proof, interval):
+    global new_block
 
-        thread = threading.Thread(target=self.run, args=())
-        thread.daemon = True
-        thread.start()
-
-    def get_last_proof(self):
+    def get_last_proof():
         r = requests.get(url=node + "/last_proof")
         try:
             data = r.json()
@@ -69,40 +76,27 @@ class PollNewBlock(object):
                 f"{color.RED}Unexpected response from server when polling for changes.{color.END}"
             )
 
-    def run(self):
-        global new_block
-        while True:
-            time.sleep(self.interval)
-            new_proof = self.get_last_proof()
-            print(new_proof)
-            print(self.last_proof)
+    while True:
+        time.sleep(interval)
+        new_proof = get_last_proof()
+
+        if last_proof != new_proof:
             new_block = True
-
-            if self.last_proof == new_proof:
-                new_block = True
-                break
+            break
 
 
-class Spinny(object):
-    def __init__(self, interval=1):
-        self.interval = interval
-
-        thread = threading.Thread(target=self.run, args=())
-        thread.daemon = True
-        thread.start()
-
-    def spinning_cursor(self):
+def Spinny():
+    def spinning_cursor():
         while True:
             for cursor in "|/-\\":
                 yield cursor
 
-    def run(self):
-        spinner = self.spinning_cursor()
-        while True:
-            sys.stdout.write(next(spinner))
-            sys.stdout.flush()
-            time.sleep(0.1)
-            sys.stdout.write("\b")
+    spinner = spinning_cursor()
+    while True:
+        sys.stdout.write(next(spinner))
+        sys.stdout.flush()
+        time.sleep(0.1)
+        sys.stdout.write("\b")
 
 
 def valid_proof(last_hash, proof):
@@ -117,6 +111,29 @@ def valid_proof(last_hash, proof):
     return last_hash[-6:] == proof_hash[:6]
 
 
+def get_total_coins(_id, node):
+    r = requests.get(url=node + "/full_chain")
+    try:
+        chain = r.json()["chain"]
+    except json.decoder.JSONDecodeError:
+        print(f"{color.RED}{color.BOLD}Unexpected response from server.{color.END}")
+        return
+    except Exception:
+        raise requests.exceptions.RequestException(
+            "Unexpected error fetching blockchain."
+        )
+
+    coins = 0
+    for block in chain:
+        if (
+            "recipient" in block["transactions"]
+            and block["transactions"]["recipient"] == _id
+        ):
+            coins += 1
+
+    return coins
+
+
 if __name__ == "__main__":
     print(f"\u001b[38;5;190m{titlecard}\033[0m")
     # What node are we interacting with?
@@ -124,8 +141,6 @@ if __name__ == "__main__":
         node = sys.argv[1]
     else:
         node = "https://lambda-coin.herokuapp.com/api"
-
-    coins_mined = 0
 
     # Load or create ID
     f = open("my_id.txt", "r")
@@ -137,12 +152,19 @@ if __name__ == "__main__":
         print("ERROR: You must change your name in `my_id.txt`!")
         exit()
 
+    coins_mined = 0
+    total_coins = get_total_coins(_id, node)
+    print(
+        f"You currently have {color.GREEN}{total_coins}{color.END} coins in the chain."
+    )
+
     # Run forever until interrupted
-    try:
-        while True:
+    while True:
+        try:
             new_block = False
 
             # Get the last proof from the server
+            print("Getting last proof...")
             r = requests.get(url=node + "/last_proof")
             try:
                 data = r.json()
@@ -157,12 +179,12 @@ if __name__ == "__main__":
             new_proof = proof_of_work(data.get("proof"))
 
             if new_block:
-                print(f"{color.YELLOW}New proof found, refreshing...{color.END}")
+                print(f"{color.YELLOW}New block found, refreshing...{color.END}")
                 continue
 
             # Found, let's send to server
             post_data = {"proof": new_proof, "id": _id}
-            # r = requests.post(url=node + "/mine", json=post_data)
+            r = requests.post(url=node + "/mine", json=post_data)
 
             try:
                 data = r.json()
@@ -176,13 +198,22 @@ if __name__ == "__main__":
             # Confirmation and success message
             if data.get("message") == "New Block Forged":
                 coins_mined += 1
-                print(
-                    f"\n{color.GREEN}Total lambda coins mined: {coins_mined}{color.END}"
-                )
+                print(f"\n{color.GREEN}{color.BOLD}SUCCESS!{color.END}")
+                print(f"{color.GREEN}Lambda coins mined: {coins_mined}{color.END}")
             else:
                 print(f"{color.RED}{data.get('message')}{color.END}")
-    except KeyboardInterrupt:
-        print(f"{color.BOLD}\nKeyboard Interrupt received.{color.END}")
-        print("Quitting...")
+        except KeyboardInterrupt:
+            print(f"{color.BOLD}\nKeyboard Interrupt received.{color.END}")
+            print("Quitting...")
+            break
+        except requests.exceptions.RequestException:
+            print(f"{color.RED}Error connecting to server. Retrying...{color.END}")
+            continue
+        except Exception:
+            continue
 
-    print(f"\n{color.GREEN}Total lambda coins mined: {coins_mined}{color.END}")
+    print(f"\nLambda coins mined: {color.GREEN}{coins_mined}{color.END}")
+    print(
+        f"Total lambda coins in the chain: {color.GREEN}{coins_mined + total_coins}{color.END}"
+    )
+
