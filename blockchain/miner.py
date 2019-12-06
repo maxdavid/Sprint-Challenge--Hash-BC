@@ -13,6 +13,7 @@ from timeit import default_timer as timer
 import random
 
 from style import color
+from table import hash_table
 
 titlecard = """
 ╦  ┌─┐┌┬┐┌┐ ┌┬┐┌─┐  ╔═╗┌─┐ ┬ ┌┐┌
@@ -61,6 +62,16 @@ def proof_of_work(last_proof):
     # spinning_cursor.join()
     # block_poller.join()
     return proof
+
+
+def look_up(last_proof):
+    print(f"\n{color.BOLD}Using lookup table...{color.END}")
+    last_hash = hashlib.sha256(str(last_proof).encode()).hexdigest()
+    if last_hash[-6:] in hash_table:
+        print("last proof:", last_proof)
+        return hash_table[last_hash[-6:]]
+    else:
+        proof_of_work(last_proof)
 
 
 def PollNewBlock(last_proof, interval):
@@ -176,7 +187,8 @@ if __name__ == "__main__":
                 break
 
             # Work on getting a new proof
-            new_proof = proof_of_work(data.get("proof"))
+            # new_proof = proof_of_work(data.get("proof"))
+            new_proof = look_up(data.get("proof"))
 
             if new_block:
                 print(f"{color.YELLOW}New block found, refreshing...{color.END}")
