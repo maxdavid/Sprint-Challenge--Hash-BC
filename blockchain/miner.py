@@ -67,9 +67,10 @@ def proof_of_work(last_proof):
 def look_up(last_proof):
     print(f"\n{color.BOLD}Using lookup table...{color.END}")
     last_hash = hashlib.sha256(str(last_proof).encode()).hexdigest()
-    if last_hash[-6:] in hash_table:
+    hash_int = int(last_hash[-6:], 16)
+    if hash_int in hash_table:
         print("last proof:", last_proof)
-        return hash_table[last_hash[-6:]]
+        return hash_table[hash_int]
     else:
         proof_of_work(last_proof)
 

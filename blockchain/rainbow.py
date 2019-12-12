@@ -14,11 +14,12 @@ if __name__ == "__main__":
 
         while count <= 0xFFFFFF:
             proof_hash = hashlib.sha256(str(proof).encode()).hexdigest()
+            hash_int = int(proof_hash[:6],16)
 
-            if proof_hash[:6] not in dict_table:
-                dict_table[proof_hash[:6]] = proof
+            if hash_int not in dict_table:
+                dict_table[hash_int] = proof
                 count += 1
-                f.write(f"'{proof_hash[:6]}': {proof},\n")
+                f.write(f"{hash_int}: {proof},\n")
                 print(
                     f"Proof for {proof_hash[:6]} found. Only {0xffffff - count} left to go!"
                 )
