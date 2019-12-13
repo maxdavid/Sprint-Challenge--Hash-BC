@@ -18,11 +18,11 @@ if __name__ == "__main__":
 
             if hash_int not in dict_table:
                 dict_table[hash_int] = proof
-                count += 1
                 f.write(f"{hash_int}: {proof},\n")
                 print(
                     f"Proof for {proof_hash[:6]} found. Only {0xffffff - count} left to go!"
                 )
+                count += 1
             proof += 1
 
         f.write("}\n")
