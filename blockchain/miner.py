@@ -13,7 +13,9 @@ from timeit import default_timer as timer
 import random
 
 from style import color
-from table import hash_table
+# from table import hash_table
+from tinydb import TinyDB, Query
+db = TinyDB('table.json')
 
 titlecard = """
 ╦  ┌─┐┌┬┐┌┐ ┌┬┐┌─┐  ╔═╗┌─┐ ┬ ┌┐┌
@@ -68,9 +70,12 @@ def look_up(last_proof):
     print(f"\n{color.BOLD}Using lookup table...{color.END}")
     last_hash = hashlib.sha256(str(last_proof).encode()).hexdigest()
     hash_int = int(last_hash[-6:], 16)
-    if hash_int in hash_table:
+    query = Query()
+    # if hash_int in hash_table:
+    if (len(db.search(query.hash == hash_int)) > 0):
         print("last proof:", last_proof)
-        return hash_table[hash_int]
+        # return hash_table[hash_int]
+        return db.search(query.hash == hash_int)[0]['proof']
     else:
         proof_of_work(last_proof)
 
